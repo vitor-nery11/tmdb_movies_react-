@@ -3,6 +3,7 @@ import Search from "./components/Search";
 import Spinner from "./components/Spinner";
 import MovieCard from "./components/MovieCard";
 
+
 const API_BASE_URL = "https://api.themoviedb.org/3";
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 
@@ -21,49 +22,64 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
+    const controller = new AbortController();
 
     const fetchMovies = async () => {
       setIsLoading(true);
       setErrorMessage("");
 
       try {
-        const endpoint = `${API_BASE_URL}/discover/movie?sort_by=popularity.desc`;
-        const response = await fetch(endpoint, API_OPTIONS);
+        if (!API_KEY) {
+          throw new Error("Missing VITE_TMDB_API_KEY environment variable");
+        }
+
+        const query = searchTerm.trim();
+        const endpoint = query
+          ? `${API_BASE_URL}/search/movie?query=${encodeURIComponent(query)}`
+          : `${API_BASE_URL}/discover/movie?sort_by=popularity.desc`;
+
+        const response = await fetch(endpoint, {
+          ...API_OPTIONS,
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
-          throw new Error("Error to fetch movies");
+          throw new Error(`TMDB request failed with status ${response.status}`);
         }
 
         const data = await response.json();
 
-        if (!data.results) {
+        if (!Array.isArray(data.results)) {
           throw new Error(data.status_message || "Failed to fetch movies");
         }
 
-        if (isMounted) {
-          setMoviesList(data.results);
-        }
+        setMoviesList(data.results);
       } catch (error) {
-        console.error("Error searching movies:", error);
-
-        if (isMounted) {
-          setMoviesList([]);
-          setErrorMessage("Error fetching movies. Please try again later");
+        if (error.name === "AbortError") {
+          return;
         }
+
+        console.error("Error searching movies:", error);
+        setMoviesList([]);
+        setErrorMessage(
+          error.message === "Missing VITE_TMDB_API_KEY environment variable"
+            ? "Configure VITE_TMDB_API_KEY in .env.local and restart the dev server."
+            : "Error fetching movies. Please try again later"
+        );
       } finally {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setIsLoading(false);
         }
       }
     };
 
-    fetchMovies();
+    const timeoutId = setTimeout(fetchMovies, 300);
 
     return () => {
-      isMounted = false;
+      clearTimeout(timeoutId);
+      controller.abort();
     };
-  }, []);
+  }, [searchTerm]);
 
   const filteredMovies = moviesList.filter((movie) =>
     movie.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -91,11 +107,11 @@ function App() {
           ) : errorMessage ? (
             <p className="text-red-500">{errorMessage}</p>
           ) : (
-            <ul>
+            <div className="movie-grid">
               {filteredMovies.map((movie) => (
-                  <MovieCard key={movie.id} movie={movie}/>
+                <MovieCard key={movie.id} movie={movie} />
               ))}
-            </ul>
+            </div>
           )}
         </section>
       </div>

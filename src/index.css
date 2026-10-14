@@ -96,7 +96,7 @@
   .all-movies {
     @apply space-y-9;
 
-    & ul {
+    & .movie-grid {
       @apply grid grid-cols-1 gap-5 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4;
     }
   }
@@ -105,7 +105,7 @@
     @apply bg-dark-100 p-5 rounded-2xl shadow-inner shadow-light-100/10;
 
     & img {
-      @apply rounded-lg h-auto w-full;
+      @apply rounded-lg aspect-[2/3] w-full object-cover;
     }
 
     & h3 {
