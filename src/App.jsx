@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Search from "./components/Search";
 import Spinner from "./components/Spinner";
 import MovieCard from "./components/MovieCard";
-
+import { useDebounce } from "react-use";
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
@@ -17,9 +17,13 @@ const API_OPTIONS = {
 
 function App() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [moviesList, setMoviesList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Atualiza debouncedSearchTerm 600ms após o usuário parar de digitar
+  useDebounce(() => setDebouncedSearchTerm(searchTerm), 600, [searchTerm]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -33,7 +37,7 @@ function App() {
           throw new Error("Missing VITE_TMDB_API_KEY environment variable");
         }
 
-        const query = searchTerm.trim();
+        const query = debouncedSearchTerm.trim();
         const endpoint = query
           ? `${API_BASE_URL}/search/movie?query=${encodeURIComponent(query)}`
           : `${API_BASE_URL}/discover/movie?sort_by=popularity.desc`;
@@ -73,17 +77,12 @@ function App() {
       }
     };
 
-    const timeoutId = setTimeout(fetchMovies, 300);
+    fetchMovies();
 
     return () => {
-      clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [searchTerm]);
-
-  const filteredMovies = moviesList.filter((movie) =>
-    movie.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  }, [debouncedSearchTerm]); // Dispara apenas quando o termo com debounce muda
 
   return (
     <main>
@@ -103,12 +102,12 @@ function App() {
           <h2 className="mt-5">All Movies</h2>
 
           {isLoading ? (
-            <Spinner/>
+            <Spinner />
           ) : errorMessage ? (
             <p className="text-red-500">{errorMessage}</p>
           ) : (
             <div className="movie-grid">
-              {filteredMovies.map((movie) => (
+              {moviesList.map((movie) => (
                 <MovieCard key={movie.id} movie={movie} />
               ))}
             </div>
